@@ -1,0 +1,265 @@
+<html>
+    <script src='https://d3js.org/d3.v5.min.js'></script>
+
+    <link href="https://fonts.googleapis.com/css2?family=B612&display=swap" rel="stylesheet">
+    <style type="text/css">
+        /* Style for Custom Tooltip */
+        *{
+            font-family: 'B612', sans-serif;
+            color: #fff;
+        }
+        body {
+            background-image: url('./binding_dark.png');
+        }
+        div.tooltip {  
+            position: absolute; 
+            line-height: 1;
+            padding: 12px;
+            background: rgba(43,43,43, 0.8);
+            color: #fff;
+            border-radius: 2px;        
+        }
+        .states:hover{
+            opacity:0.7;
+        }
+        .points{
+            fill:#c94f4f;
+        }
+        #buttons{
+            overflow: hidden;
+            background-color: #444;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        #buttons a {
+            float: left;
+            color: #f2f2f2;
+            text-align: center;
+            padding: 14px 16px;
+            text-decoration: none;
+            font-size: 17px;
+            width: 12%;
+        }
+        #buttons a:hover {
+            background-color: #ddd;
+            color: black;
+        }
+        #conclusion {
+            height: 50px;
+        }
+    </style>
+    <body>
+        <div id="intro">
+            <h1>
+                Covid-19 Analysis
+            </h1>
+            <p>
+                Here we are exploring happiness scores. The scatter plot below shows happiness scores against number of cases divided by total population for each state as of 15/06/2020. 
+                Using cases over population gives a better understanding of how the state is doing overall at handling the spread.
+                For the remainder of this website, you can hover over a circle to get more information on what it represents.
+            </p>
+        </div>
+        </div>
+        <div id="chart"></div>
+        <div id="conclusion">
+            <p>
+                We can see from the graph above that there does not seem to be any strong correlation between happiness and cases.
+                Let's look at a more specific social factor next.
+            </p>
+        </div>
+
+        <div id="buttons">
+            <a href="./index.html">Prev</a> 
+            <a href="./index.html">1</a> 
+            <a href="./happiness.html">2</a> 
+            <a href="./emotional.html">3</a>
+            <a href="./work.html">4</a>
+            <a href="./community.html">5</a>
+            <a href="./emotional.html">Next</a>
+        </div>
+        <script>
+            //http://bl.ocks.org/michellechandra/0b2ce4923dc9b5809922
+            var width = 960;
+            var height = 500;
+
+            // D3 Projection
+            var projection = d3.geoAlbersUsa()
+                            .translate([width/2, height/2])    // translate to center of screen
+                            .scale([1000]);          // scale things down so see entire US
+                    
+            // Define path generator
+            var path = d3.geoPath()               // path generator that will convert GeoJSON to SVG paths
+                        .projection(projection);  // tell path generator to use albersUsa projection
+
+                    
+            // Define linear scale for output
+            var color = d3.scaleLinear()
+                        .domain([25,75])
+                        .range(["rgb(230, 255, 230)","rgb(0, 204, 0)"]);
+            
+            //Create SVG element and append map to the SVG
+            var svg = d3.select("#map") 
+                        .append("svg")
+                        .attr("width", width)
+                        .attr("height", height);
+
+            // Append Div for tooltip to SVG
+            var div = d3.select("#chart")
+                        .append("div")   
+                        .attr("class", "tooltip")               
+                        .style("opacity", 0);
+
+            // create scatter plot
+            var scatterPlot = d3.select("#chart")
+                    .append("svg")
+                    .attr("width", "100%")
+                    .attr("height", "600")
+                    .append("g")
+                    .attr("transform", "translate(300,50)");
+            
+            var log= d3.scaleLog().domain([500,400000]);
+            var xs = d3.scaleLinear().domain([30,70]).range([0,550]);
+            var ys = d3.scaleLinear().domain([0.0002,0.02]).range([450,0]);
+            
+            var names = {};
+            d3.csv("https://raw.githubusercontent.com/ShyamShah11/UIUC-Work/master/Data%20Visualization/Dashboard/us-states-full.csv").then(function(data){
+                d3.json("https://raw.githubusercontent.com/ShyamShah11/ShyamShah11.github.io/master/gz_2010_us_040_00_500k.json").then(function(json) {
+                        
+                    for (var i = 0; i < data.length ; i++) {
+                        if (data[i].date== "15/06/2020"){ // This is the latest date in my data
+                            
+                            var dataState = data[i].state;
+                            var dataHappiness = data[i].happiness_score;
+                            var dataCases = data[i].cases_pop;
+
+                            for (var j = 0; j < json.features.length; j++)  {
+                                // get information for map
+                                var jsonState = json.features[j].properties.NAME;
+                                if (dataState==jsonState){
+                                    json.features[j].properties.happiness_score = dataHappiness;
+                                    json.features[j].properties.cases = dataCases;
+                                    break;
+                                }
+
+                            }
+                        }
+                    }
+                    // create scatter plot
+                    scatterPlot.selectAll("circle")
+                        .data(json.features)
+                        .enter()
+                        .append("circle")
+                        .attr("class", "points")
+                        .attr("cx", function(d){if (d.properties.cases != undefined) return xs(d.properties.happiness_score);})
+                        .attr("cy", function(d){if (d.properties.cases != undefined) return ys(d.properties.cases);})
+                        .attr("r", 8)
+                        .attr("display", function(d) {if (d.properties.cases == undefined) return "none";})
+                        .on("mouseover", function(d) {      
+                            div.transition()        
+                            .duration(200)      
+                            .style("opacity", .9);      
+                            div.html(d.properties.NAME + "<br> Happiness Score: " + d.properties.happiness_score +"<br> Percentage: " + parseFloat(d.properties.cases).toFixed(4)+"%")
+                            .style("left", (d3.event.pageX) + "px")     
+                            .style("top", (d3.event.pageY - 28) + "px");    
+                        })
+                        .on("mousemove", function(d){
+                            div.style("left", (d3.event.pageX + 14) + "px")     
+                            .style("top", (d3.event.pageY- 14) + "px"); 
+                        })
+                        .on("mouseout", function(d) {       
+                            div.transition()        
+                            .duration(500)      
+                            .style("opacity", 0);   
+                        });
+
+                    
+                })
+                .catch(function(error){
+                    console.log("There was an error loading the chart");
+                })
+
+                // add x axis
+                d3.select("svg")
+                .append("g")
+                .attr("transform", "translate(300,500)")
+                .attr("fill", "none")
+                .attr("font-size", 10)
+                .attr("font-family", "sans-serif")
+                .attr("text-anchor", "end")
+                .call(d3.axisBottom(xs));
+                // x axis label
+                d3.select("svg").append("text")
+                .attr("class", "x label")
+                .attr("text-anchor", "end")
+                .attr("x", 600)
+                .attr("y", 550)
+                .attr("fill", "#ffffff")
+                .text("Happiness Score");
+
+                // add y axis
+                d3.select("svg")
+                .append("g")
+                .attr("transform", "translate(300,50)")
+                .attr("fill", "none")
+                .attr("font-size", 10)
+                .attr("font-family", "sans-serif")
+                .attr("text-anchor", "end")
+                .call(d3.axisLeft(ys));
+                // y axis label
+                d3.select("svg").append("text")
+                .attr("class", "y label")
+                .attr("text-anchor", "end")
+                .attr("x", -250)
+                .attr("y", 220)
+                .attr("fill", "#ffffff")
+                .attr("dy", ".75em")
+                .attr("transform", "rotate(-90)")
+                .text("Cases/Population");
+
+                // add annotation
+                d3.select("svg").append("text")
+                .attr("x", 300)
+                .attr("y", 40)
+                .attr("fill", "#ffffff")
+                .style("font-size", "14px")
+                .text("Harder hit states are near the middle in happiness");
+
+                d3.select("svg").append("circle")
+                .attr("cx",650)
+                .attr("cy",130)
+                .attr("r", 110)
+                .attr("stroke", "#ffffff")
+                .attr("stroke-dasharray", "4")
+                .attr("fill", "none"); 
+
+                d3.select("svg").append("line")
+                .attr("x1",500)
+                .attr("y1", 45)
+                .attr("x2", 550)
+                .attr("y2", 80)
+                .attr("stroke", "#ffffff");
+
+                //add second annotation
+                d3.select("svg").append("text")
+                .attr("x", 850)
+                .attr("y", 400)
+                .attr("fill", "#ffffff")
+                .style("font-size", "14px")
+                .text("Rest of the states are distributed");
+
+                d3.select("svg").append("rect")
+                .attr("x",310)
+                .attr("y",250)
+                .attr("width", 510)
+                .attr("height", 260)
+                .attr("fill", "none")
+                .attr("stroke-dasharray", "4")
+                .attr("stroke", "#ffffff");
+            });
+
+
+            
+        </script>
+    </body>
+</html>

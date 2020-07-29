@@ -1,7 +1,306 @@
-<!DOCTYPE html>
 <html>
-<body>
-<h1>Hello World</h1>
-<p>I'm hosted with GitHub Pages.</p>
-</body>
+    <link href="https://fonts.googleapis.com/css2?family=B612&display=swap" rel="stylesheet">
+    <script src='https://d3js.org/d3.v5.min.js'></script>
+    <style> circle {fill: lightblue; stroke: black;} </style>
+
+    <style type="text/css">
+        /* Style for Custom Tooltip */
+        *{
+            font-family: 'B612', sans-serif;
+            color: #fff;
+        }
+        body {
+            background-image: url('./binding_dark.png');
+        }
+        #map{
+            text-align: center;
+        }
+        div.tooltip {  
+            position: absolute; 
+            line-height: 1;
+            padding: 12px;
+            background: rgba(43,43,43, 0.8);
+            color: #fff;
+            border-radius: 2px;        
+        }
+        #legend {
+            text-align: center;
+        }
+        .states:hover{
+            opacity:0.7;
+        }
+        circle{
+            fill:#c94f4f;
+        }
+        .slidecontainer {
+            width: 100%; /* Width of the outside container */
+            height: 50px;
+        }
+        .slider {
+            width: 300; 
+        }
+
+        #sliderLabel{
+            margin:0px;
+        }
+
+        #buttons{
+            overflow: hidden;
+            background-color: #444;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        #buttons a {
+            float: left;
+            color: #f2f2f2;
+            text-align: center;
+            padding: 14px 16px;
+            text-decoration: none;
+            font-size: 17px;
+            width: 12%;
+        }
+        #buttons a:hover {
+            background-color: #ddd;
+            color: black;
+        }
+    </style>
+    <body>
+        <div id="intro">
+            <h1>
+                Covid-19 Analysis
+            </h1>
+            <p>
+                This website is used to explore Covid-19 cases and the impact of social factors on it's spread. It's difficult to infer these relationships without getting to look at the data.
+                The choropleth below shows the number of cases as of 15/06/2020. You can use the slider to change the date and see how the number of cases has progressed over the last few months.
+                You can mouse over the states to see the number of cases they have.
+                While navigating through this website, you will get the chance to take a look at some interesting variables plotted against Covid-19 cases. 
+                Press next to start exploring.
+            </p>
+        </div>
+        <div id="map">
+            <div class="slidecontainer">
+                <input type="range" min="1" max="91" value="91" class="slider" id="myRange">
+                <p id="sliderLabel">Date: <span id="demo"></span></p>
+            </div>
+        </div>
+        <div id="legend"></div>
+        
+        <div id="buttons">
+            <a href="./index.html">Prev</a> 
+            <a href="./index.html">1</a> 
+            <a href="./happiness.html">2</a> 
+            <a href="./emotional.html">3</a>
+            <a href="./work.html">4</a>
+            <a href="./community.html">5</a>
+            <a href="./happiness.html">Next</a>
+        </div>
+        <script>
+            // set up the slider first
+            
+            var slider = document.getElementById("myRange");
+            var output = document.getElementById("demo");
+            var d = new Date(2020, 5, 15);
+            var dd = d.getDate();
+            var dString = (dd>9 ? '' : '0')+dd+"/0"+(d.getMonth()-1)+"/"+d.getFullYear();
+            var temp = slider.value;
+            output.innerHTML = d.toDateString();
+            
+            slider.oninput = function() {
+                d.setDate(d.getDate()-(temp-this.value));
+                output.innerHTML = d.toDateString();
+                temp=this.value;
+                dd = d.getDate()
+                dString = (dd>9 ? '' : '0')+dd+"/0"+(d.getMonth()-1)+"/"+d.getFullYear();
+                console.log(temp);
+                // change map data
+                var svg = d3.select("#map");
+                svg.selectAll("path")
+                .style("fill", function(d) {
+                    if (d.properties.cases != undefined){
+                        // Get data value
+                        var value = d.properties.cases[parseInt(temp)+(parseInt(d.properties.cases.length)-92)];
+
+                        if (value) {
+                            //If value exists…
+                            return color(Math.log(value));
+                        } else {
+                            //If value is undefined…
+                            return "rgb(213,222,217)";
+                        }
+                    }
+                })
+                .on("mouseover", function(d) {      
+                    div.transition()        
+                    .duration(200)      
+                    .style("opacity", .9);      
+                    div.html(d.properties.NAME + "<br> Cases: " + d.properties.cases[parseInt(temp)+(parseInt(d.properties.cases.length)-92)])
+                    .style("left", (d3.event.pageX) + "px")     
+                    .style("top", (d3.event.pageY - 28) + "px");    
+                }); 
+            }
+
+            // start making the viz
+            //http://bl.ocks.org/michellechandra/0b2ce4923dc9b5809922
+            var width = 960;
+            var height = 500;
+            var test = "hi";
+            // D3 Projection
+            var projection = d3.geoAlbersUsa()
+                            .translate([width/2, height/2])    // translate to center of screen
+                            .scale([1000]);          // scale things down so see entire US
+                    
+            // Define path generator
+            var path = d3.geoPath()               // path generator that will convert GeoJSON to SVG paths
+                        .projection(projection);  // tell path generator to use albersUsa projection
+
+                    
+            // Define linear scale for output
+            var color = d3.scaleLinear()
+                        .domain([Math.log(1),Math.log(400000)])
+                        .range(["rgb(255, 204, 204)","rgb(255, 0, 0)"]);
+            
+            //Create SVG element and append map to the SVG
+            var svg = d3.select("#map") 
+                        .append("svg")
+                        .attr("width", width)
+                        .attr("height", height);
+
+            // Append Div for tooltip to SVG
+            var div = d3.select("#map")
+                        .append("div")   
+                        .attr("class", "tooltip")               
+                        .style("opacity", 0);
+            
+            var names = {};
+            d3.csv("https://raw.githubusercontent.com/ShyamShah11/UIUC-Work/master/Data%20Visualization/Dashboard/us-states-full.csv").then(function(data){
+                d3.json("https://raw.githubusercontent.com/ShyamShah11/ShyamShah11.github.io/master/gz_2010_us_040_00_500k.json").then(function(json) {
+                    var dataCases = [];
+                    var counter = 0;
+                    var dataState = data[0].state;
+                    for (var i = 0; i < data.length ; i++) {
+
+                        if (dataState != data[i].state){ //have read all the data for a state
+                            for (var j = 0; j < json.features.length; j++)  {
+                                // get information for map
+                                var jsonState = json.features[j].properties.NAME;
+                                if (dataState==jsonState){
+                                    json.features[j].properties.cases = dataCases;
+                                    break;
+                                }
+
+                            }
+                            dataCases = [];
+                        }
+                        dataState = data[i].state;
+                        dataCases.push(data[i].cases);
+                    }
+                    for (var j = 0; j < json.features.length; j++)  {
+                        // get information for map
+                        var jsonState = json.features[j].properties.NAME;
+                        if (dataState==jsonState){
+                            json.features[j].properties.cases = dataCases;
+                            break;
+                        }
+
+                    }
+                    // create map 
+                    // Bind the data to the SVG and create one path per GeoJSON feature
+                    svg.selectAll("path")
+                        .data(json.features)
+                        .enter()
+                        .append("path")
+                        .attr("d", path)
+                        .attr("class", "states")
+                        .style("stroke", "#fff")
+                        .style("stroke-width", "1")
+                        .style("fill", function(d) {
+                            if (d.properties.cases != undefined){
+                                // Get data value
+                                var value = d.properties.cases[d.properties.cases.length-1];
+
+                                if (value) {
+                                    //If value exists…
+                                    return color(Math.log(value));
+                                } else {
+                                    //If value is undefined…
+                                    return "rgb(213,222,217)";
+                                }
+                            }
+                        })
+                        .on("mouseover", function(d) {      
+                            div.transition()        
+                            .duration(200)      
+                            .style("opacity", .9);      
+                            div.html(d.properties.NAME + "<br> Cases: " + d.properties.cases[d.properties.cases.length-1])
+                            .style("left", (d3.event.pageX) + "px")     
+                            .style("top", (d3.event.pageY - 28) + "px");    
+                        })
+                        .on("mousemove", function(d){
+                            div.style("left", (d3.event.pageX + 14) + "px")     
+                            .style("top", (d3.event.pageY- 14) + "px"); 
+                        })
+                        .on("mouseout", function(d) {       
+                            div.transition()        
+                            .duration(500)      
+                            .style("opacity", 0);   
+                        }); 
+                })
+                .catch(function(error){
+                    console.log("There was an error loading the map");
+                })
+            });
+
+            //Append a defs (for definition) element to your SVG
+            var legendSvg = d3.select("#legend").append("svg");
+            var defs = legendSvg.append("defs");
+
+            //Append a linearGradient element to the defs and give it a unique id
+            var linearGradient = defs.append("linearGradient")
+                .attr("id", "linear-gradient")
+                .attr("x1", "0%")
+                .attr("y1", "0%")
+                .attr("x2", "100%")
+                .attr("y2", "0%");
+
+            //Set the color for the start (0%)
+            linearGradient.append("stop")
+                .attr("offset", "0%")
+                .attr("stop-color", "rgb(255, 204, 204)");
+
+            //Set the color for the end (100%)
+            linearGradient.append("stop")
+                .attr("offset", "100%")
+                .attr("stop-color", "rgb(255, 0, 0)"); 
+            var legendWidth = 200;
+            var legendHeight = 20;
+            var legendX = document.getElementById("legend").getBoundingClientRect().width * 0.4;
+            var legendY = 20;
+            //Draw the rectangle and fill with gradient
+            legendSvg.append("rect")
+                .attr("width", legendWidth)
+                .attr("height", legendHeight)
+                .attr("x", legendX)
+                .attr("y", legendY)
+                .style("fill", "url(#linear-gradient)");
+            
+            var svgLegend = d3.select("#legend");
+            //create tick marks
+            var xLeg = d3.scaleLinear()
+            .domain([1, 400000])
+            .range([0, legendWidth]);
+
+            var axisLeg = d3.axisBottom(xLeg)
+            .tickValues([1, 400000]);
+
+            legendSvg
+            .attr("class", "axis")
+            .attr("width", "100%")
+            .attr("height", legendHeight + 60)
+            .append("g")
+            .attr("transform", "translate(" + legendX + ", " + (legendY+legendHeight) + ")")
+            .call(axisLeg);
+            
+        </script>
+    </body>
 </html>
